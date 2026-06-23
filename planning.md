@@ -69,3 +69,72 @@ A human writes a formal research paper or legal brief and uses strict grammar ch
 
 ### Edge Case 2: Stylized Short Poetry
 A human submits a four-line poem with a rigid, repetitive meter (like a Haiku) and simple vocabulary. Because the text is incredibly short, the stylometric engine lacks the data points to calculate a statistically significant variance. Furthermore, the semantic LLM may interpret the rigid structural constraints of the poem as artificial generation, leading to an inaccurate AI label. *(Mitigation: Submissions under 100 words should automatically bypass stylometric checks).*
+
+
+## Architecture
+
+```text
+=======================================================================================
+FLOW 1: CONTENT SUBMISSION WORKFLOW (POST /submit)
+=======================================================================================
+
+                                  +-----------------------+
+                                  | Signal 1: LLM-Based   |    Semantic Score
+                              +-->| Classification (Groq) |------ (0.0 - 1.0) ----+
+                              |   +-----------------------+                       |
+                              |                                                   v
+  +----------------+      +--------------+                               +----------------+
+  | User Content   |      |              |                               |                |
+  | Submission     |----->| Detection    |                               | Scoring Engine |
+  | (POST /submit) | Raw  | Orchestrator |                               | (Dynamic Veto) |
+  +----------------+ Text +--------------+                               |                |
+                              |                                          +----------------+
+                              |   +-----------------------+                       | 
+                              |   | Signal 2: Stylometric |                       | Combined Score 
+                              +-->| Heuristics (Python)   |------ (0.0 - 1.0) ----+ (0.0 - 1.0)
+                                  +-----------------------+                       |
+                                      Stylometric Score                           v
+                                                                         +----------------+
+                                                                         | Label Generator|
+                                                                         +----------------+
+                                                                                  |
+                                                                                  | Transparency Label Text
+                                                                                  v
+                                                                         +----------------+
+                                                                         |  Audit Logger  | (Saves Record)
+                                                                         +----------------+
+                                                                                  |
+                                                                                  | Returns Data
+                                                                                  v
+                                                                         +----------------+
+                                                                         | Response       |
+                                                                         | Payload (JSON) |
+                                                                         +----------------+
+
+
+=======================================================================================
+FLOW 2: CONTENT APPEAL WORKFLOW (POST /appeal)
+=======================================================================================
+
+  +----------------+     Submission ID,    +----------------+
+  | User Appeal    |     Reasoning         | Status Update  |
+  | Submission     |---------------------->| System         |
+  | (POST /appeal) |                       | (Under Review) |
+  +----------------+                       +----------------+
+                                                   |
+                                                   | Appeal Logged
+                                                   v
+                                           +----------------+
+                                           |  Audit Logger  | (Appends to original log)
+                                           +----------------+
+                                                   |
+                                                   | Appeal Processed
+                                                   v
+                                           +----------------+
+                                           | Response       |
+                                           | Payload (JSON) |
+                                           +----------------+
+```
+When a piece of text is submitted, the orchestrator routes it simultaneously through a semantic LLM evaluator and a statistical stylometric engine; the Scoring Engine then synthesizes these two distinct signals (using a semantic veto for highly edited text) into a final confidence score, which generates a plain-language transparency label that is logged and returned to the user. If a creator contests this result, the appeal flow updates the database status to "under review" and attaches their written reasoning directly to the original automated decision in the audit log for human review.
+
+##AI Tool Plan
