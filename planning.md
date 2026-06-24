@@ -71,7 +71,7 @@ A human writes a formal research paper or legal brief and uses strict grammar ch
 A human submits a four-line poem with a rigid, repetitive meter (like a Haiku) and simple vocabulary. Because the text is incredibly short, the stylometric engine lacks the data points to calculate a statistically significant variance. Furthermore, the semantic LLM may interpret the rigid structural constraints of the poem as artificial generation, leading to an inaccurate AI label. *(Mitigation: Submissions under 100 words should automatically bypass stylometric checks).*
 
 
-## Architecture
+## 6. Architecture
 
 ```text
 =======================================================================================
@@ -137,4 +137,21 @@ FLOW 2: CONTENT APPEAL WORKFLOW (POST /appeal)
 ```
 When a piece of text is submitted, the orchestrator routes it simultaneously through a semantic LLM evaluator and a statistical stylometric engine; the Scoring Engine then synthesizes these two distinct signals (using a semantic veto for highly edited text) into a final confidence score, which generates a plain-language transparency label that is logged and returned to the user. If a creator contests this result, the appeal flow updates the database status to "under review" and attaches their written reasoning directly to the original automated decision in the audit log for human review.
 
-##AI Tool Plan
+---
+
+## 7. AI Tool Plan
+
+### M3: Submission Endpoint & Signal 1 (Semantic)
+* **Context to Provide:** Section 1 (Detection Signals) and Section 6 (Architecture Diagram).
+* **What to Ask For:** "Generate a backend server skeleton (e.g., FastAPI or Flask) with a `POST /submit` endpoint. Then, implement the first signal function using the Groq API SDK to evaluate text and return a float between 0.0 and 1.0."
+* **How to Verify:** Run the server locally and manually send a clearly human-written paragraph and a clearly AI-generated paragraph. Check that the Groq API connects successfully and returns appropriately differing semantic scores before wiring up anything else.
+
+### M4: Signal 2 (Stylometric) & Confidence Scoring
+* **Context to Provide:** Section 1 (Detection Signals), Section 2 (Uncertainty Representation), and Section 6 (Architecture Diagram).
+* **What to Ask For:** "Implement a pure Python stylometric function calculating sentence length variance and type-token ratio. Then, build the Scoring Engine function that combines this with the Semantic score, explicitly coding the 'Semantic Veto' logic for conflicting signals."
+* **How to Verify:** Write a quick unit test passing hardcoded, conflicting signal values into the Scoring Engine (e.g., Semantic = 0.15, Stylometric = 0.90) to guarantee the math triggers the veto penalty and outputs a score in the "Uncertain" band rather than a raw 50/50 average.
+
+### M5: Production Layer (Labels & Appeals)
+* **Context to Provide:** Section 3 (Transparency Label Design), Section 4 (Appeals Workflow), and Section 6 (Architecture Diagram).
+* **What to Ask For:** "Implement the Label Generator logic to return exact text based on score thresholds. Then, build the `POST /appeal` endpoint to accept a `submission_id` and reasoning, update the status to `under_review`, and append the data to an audit log."
+* **How to Verify:** Feed the system edge-case scores to ensure all three label variants are physically reachable. Then, send a mock payload to the `/appeal` endpoint and verify the JSON audit log updates correctly with the appended reasoning and new status.
