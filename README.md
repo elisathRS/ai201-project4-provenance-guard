@@ -320,3 +320,53 @@ Users can appeal via `POST /appeal` with reasoning. Long-term improvements would
 - **Short submissions:** Submissions under 10 tokens or 2 sentences fall back to a default score (0.5), making them essentially unclassifiable.
 - **Model drift:** As LLMs evolve, the semantic signal may become obsolete without periodic re-tuning of the Groq prompt.
 - **Language and culture:** The system is optimized for English idiomatic writing and may misclassify non-native English or culturally diverse styles.
+
+---
+
+## Spec Reflection
+
+### One Way the Spec Helped
+
+**Clarity on signal independence:**  
+The specification required two *distinct* detection signals (one semantic, one stylometric) with separate scores persisted in the audit log. This requirement forced a clean separation of concerns and prevented feature creep. Instead of trying to build a single magic scoring function, we built two independent, interpretable signals that could be examined and debugged separately. When the system misclassifies, reviewers can immediately see whether it was the semantic or stylometric component that failed, enabling targeted improvements.
+
+### One Way Implementation Diverged from the Spec (and Why)
+
+**Score combination and veto logic:**  
+The spec required combining two signals into a single confidence score but did not specify the exact weighting or veto mechanism. Implementation chose:
+- **60/40 weighting** (semantic over stylometric) based on observed reliability differences
+- **Semantic veto:** If semantic is very confident human (≤ 0.25) but stylometric is very confident AI (≥ 0.75), reduce stylometric weight to 0.25×
+
+This divergence was necessary because raw 60/40 averaging alone produced false positives on atypical human writing (e.g., repetitive technical documentation). The veto prevents the system from misclassifying a lawyer's precisely-drafted contract as AI-generated solely because it has uniform phrasing. The spec prioritized the transparency label appearing in the response, not the exact algorithm; the veto was an implementation refinement to reduce harm.
+
+---
+
+## AI Usage: Directed Decisions and Revisions
+
+### Instance 1: Groq JSON Output Cleaning
+
+**What was directed:**  
+Early versions of the semantic signal handler did not robustly handle Groq's response formatting. The system expected pure JSON but sometimes received JSON wrapped in markdown code fences (e.g., ` ```json\n{...}\n``` `). I directed the implementation to add a multi-step cleanup: first strip markdown fences, then regex-extract the JSON object if parsing failed.
+
+**What was revised:**  
+Initial regex logic was too aggressive and sometimes truncated valid JSON. User feedback showed that submissions were occasionally failing with `JSONDecodeError` even though the LLM response was valid. The cleanup was tightened to:
+1. Remove leading ` ```[language]\n ` exactly
+2. Remove trailing ` \n``` ` exactly
+3. Fall back to substring extraction only if the first two steps fail
+
+This reduced false failures and made the system more resilient.
+
+---
+
+### Instance 2: Label Boundary Thresholds
+
+**What was directed:**  
+The system needed three discrete labels from a continuous confidence score. I suggested symmetric thresholds: score ≤ 0.33 → "Human Authored", 0.33–0.67 → "Uncertain", ≥ 0.67 → "Automated Content". This seemed statistically balanced.
+
+**What was overridden:**  
+After testing with real submissions, these thresholds produced too many false positives in the middle band. A human-authored personal narrative that should be "Human Authored" would score 0.35 and fall into "Uncertain Origin" instead, creating user confusion. The thresholds were adjusted to:
+- ≤ 0.20 → "Human Authored" (only high-confidence human)
+- ≥ 0.85 → "Automated Content" (only high-confidence AI)
+- 0.20–0.85 → "Uncertain Origin" (everything ambiguous)
+
+This wider "Uncertain" band is more honest about the system's actual confidence limits and reduces false claims of AI authorship on borderline content. The trade-off is that fewer submissions receive a definitive label, but accuracy improved.
