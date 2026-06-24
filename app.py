@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from groq import Groq
 
 load_dotenv()
@@ -15,6 +17,13 @@ load_dotenv()
 app = Flask(__name__)
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 LOG_PATH = os.path.join(os.path.dirname(__file__), "audit_log.jsonl")
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 SEMANTIC_PROMPT = """You are an AI-authorship detection expert.
 Analyze the text below and return a single JSON object with keys:
@@ -160,10 +169,13 @@ def get_log(limit: int = 100) -> list[dict]:
             except json.JSONDecodeError:
                 continue
 
+    if limit <= 0:
+        return entries
     return entries[-limit:]
 
 
 @app.route("/submit", methods=["POST"])
+@limiter.limit("10 per minute;100 per day")
 def submit():
     """
     POST /submit
@@ -236,10 +248,42 @@ def get_log_endpoint():
     return jsonify({"entries": get_log()})
 
 
+def persist_audit_log(entries: list[dict]) -> None:
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    with open(LOG_PATH, "w", encoding="utf-8") as log_file:
+        for entry in entries:
+            log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
 @app.route("/appeal", methods=["POST"])
 def appeal():
-    """POST /appeal — stub, implemented in M5."""
-    return jsonify({"message": "Appeal endpoint not yet implemented."}), 501
+    """POST /appeal accepts a content_id and creator_reasoning, updates status, and logs the appeal."""
+    data = request.get_json(silent=True)
+    if not data or "content_id" not in data or "creator_reasoning" not in data:
+        return jsonify({"error": "Request body must be JSON with 'content_id' and 'creator_reasoning' fields."}), 400
+
+    content_id = data["content_id"]
+    creator_reasoning = data["creator_reasoning"]
+    if not isinstance(content_id, str) or not content_id.strip():
+        return jsonify({"error": "'content_id' must be a non-empty string."}), 400
+    if not isinstance(creator_reasoning, str) or not creator_reasoning.strip():
+        return jsonify({"error": "'creator_reasoning' must be a non-empty string."}), 400
+
+    entries = get_log(limit=0)
+    updated = False
+    for entry in entries:
+        if entry.get("content_id") == content_id:
+            entry["status"] = "under_review"
+            entry["appeal_reasoning"] = creator_reasoning
+            entry["appeal_timestamp"] = datetime.now(timezone.utc).isoformat()
+            updated = True
+            break
+
+    if not updated:
+        return jsonify({"error": "Content ID not found."}), 404
+
+    persist_audit_log(entries)
+    return jsonify({"message": "Appeal received.", "content_id": content_id, "status": "under_review"}), 200
 
 
 if __name__ == "__main__":
