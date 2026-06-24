@@ -1,2 +1,3 @@
 {"content_id": "29b19900-2799-4b05-9680-05d8a7ddc42b", "creator_id": "test-user-1", "timestamp": "2026-06-24T00:11:03.774851+00:00", "attribution": "likely_human", "confidence": 0.2, "llm_score": 0.2, "status": "classified"}
 {"content_id": "22f57769-3996-4f20-990a-ee04bdfbca14", "creator_id": "test-user-2", "timestamp": "2026-06-24T00:12:35.730510+00:00", "attribution": "likely_human", "confidence": 0.2, "llm_score": 0.2, "status": "classified"}
+{"content_id": "36e6c5cf-5134-4cab-8f15-7fd597bce6d4", "creator_id": "test-user-verify", "timestamp": "2026-06-24T00:31:09.382045+00:00", "attribution": "uncertain", "confidence": 0.62, "semantic_score": 0.7, "stylometric_score": 0.5, "status": "classified"}

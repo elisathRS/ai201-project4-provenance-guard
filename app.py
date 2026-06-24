@@ -2,6 +2,7 @@ import os
 import re
 import json
 import uuid
+import math
 import statistics
 from datetime import datetime, timezone
 
@@ -23,6 +24,11 @@ Analyze the text below and return a single JSON object with keys:
 Scoring criteria:
 - 0.0 = Highly likely Human (idiosyncratic metaphors, emotional leaps, unpredictable flow, personal voice)
 - 1.0 = Highly likely AI (formulaic phrasing, uniform structure, exhaustive hedging, semantic predictability)
+
+Instructions:
+- Use values near 0.0 only for text that clearly reads as human-written.
+- Use values near 1.0 only for text that clearly reads as AI-generated.
+- Use mid-range values only for mixed or uncertain text.
 
 Text to analyze:
 \"\"\"
@@ -85,9 +91,10 @@ def stylometric_score(text: str) -> dict:
     variance = statistics.pvariance(sentence_lengths)
     ttr = len(set(tokens)) / len(tokens)
 
-    length_uniformity = 1.0 - min(variance / 25.0, 1.0)
+    cv = math.sqrt(variance) / avg_length if avg_length > 0 else 1.0
+    length_uniformity = max(0.0, 1.0 - min(cv, 1.0))
     vocab_uniformity = 1.0 - min(ttr, 1.0)
-    score = max(0.0, min(1.0, 0.6 * length_uniformity + 0.4 * vocab_uniformity))
+    score = max(0.0, min(1.0, 0.75 * length_uniformity + 0.25 * vocab_uniformity))
 
     return {
         "score": score,
