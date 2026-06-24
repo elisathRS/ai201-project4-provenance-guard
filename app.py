@@ -2,6 +2,7 @@ import os
 import re
 import json
 import uuid
+import statistics
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -68,6 +69,61 @@ def semantic_score(text: str) -> dict:
     }
 
 
+def stylometric_score(text: str) -> dict:
+    """
+    Signal 2: stylometric heuristics.
+    Computes sentence length variance and type-token ratio, then converts them into a single AI-likelihood score.
+    """
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    tokens = [t for t in re.findall(r"\b\w+\b", text.lower())]
+
+    if len(tokens) < 10 or len(sentences) < 2:
+        return {"score": 0.5, "metrics": {"note": "text too short for reliable stylometry"}}
+
+    sentence_lengths = [len(re.findall(r"\b\w+\b", sentence)) for sentence in sentences]
+    avg_length = statistics.mean(sentence_lengths)
+    variance = statistics.pvariance(sentence_lengths)
+    ttr = len(set(tokens)) / len(tokens)
+
+    length_uniformity = 1.0 - min(variance / 25.0, 1.0)
+    vocab_uniformity = 1.0 - min(ttr, 1.0)
+    score = max(0.0, min(1.0, 0.6 * length_uniformity + 0.4 * vocab_uniformity))
+
+    return {
+        "score": score,
+        "metrics": {
+            "sentence_count": len(sentences),
+            "avg_sentence_length": avg_length,
+            "sentence_length_variance": variance,
+            "type_token_ratio": ttr,
+            "length_uniformity": length_uniformity,
+            "vocab_uniformity": vocab_uniformity,
+        },
+    }
+
+
+def combine_scores(semantic_score_value: float, stylometric_score_value: float) -> float:
+    """
+    Combine semantic and stylometric scores using baseline 60/40 weighting and a semantic veto.
+    """
+    sem = max(0.0, min(1.0, semantic_score_value))
+    styl = max(0.0, min(1.0, stylometric_score_value))
+
+    if sem <= 0.25 and styl >= 0.75:
+        styl = styl * 0.25
+
+    combined = 0.6 * sem + 0.4 * styl
+    return max(0.0, min(1.0, combined))
+
+
+def label_from_score(score: float) -> str:
+    if score <= 0.20:
+        return "Human Authored"
+    if score >= 0.85:
+        return "Automated Content"
+    return "Uncertain Origin"
+
+
 def _attribution_from_score(score: float) -> str:
     if score >= 0.85:
         return "likely_ai"
@@ -119,22 +175,24 @@ def submit():
         return jsonify({"error": "'creator_id' must be a non-empty string."}), 400
 
     try:
-        signal_result = semantic_score(text)
+        semantic_result = semantic_score(text)
     except (ValueError, Exception) as exc:
         return jsonify({"error": f"Semantic analysis failed: {exc}"}), 502
 
-    content_id = str(uuid.uuid4())
-    confidence = signal_result["score"]
-    attribution = signal_result["attribution"]
-    label = _stub_label(confidence)
+    stylometric_result = stylometric_score(text)
+    combined_score = combine_scores(semantic_result["score"], stylometric_result["score"])
+    attribution = _attribution_from_score(combined_score)
+    label = label_from_score(combined_score)
 
+    content_id = str(uuid.uuid4())
     audit_entry = {
         "content_id": content_id,
         "creator_id": creator_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "attribution": attribution,
-        "confidence": confidence,
-        "llm_score": confidence,
+        "confidence": combined_score,
+        "semantic_score": semantic_result["score"],
+        "stylometric_score": stylometric_result["score"],
         "status": "classified",
     }
     append_audit_log(audit_entry)
@@ -142,12 +200,16 @@ def submit():
     payload = {
         "content_id": content_id,
         "attribution": attribution,
-        "confidence": confidence,
+        "confidence": combined_score,
         "label": label,
     }
 
     if app.debug:
-        payload["_debug"] = {"llm_score": confidence}
+        payload["_debug"] = {
+            "semantic_score": semantic_result["score"],
+            "stylometric_score": stylometric_result["score"],
+            "combined_score": combined_score,
+        }
 
     return jsonify(payload), 200
 
