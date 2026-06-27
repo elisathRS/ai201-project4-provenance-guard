@@ -221,6 +221,8 @@ def submit():
         "attribution": attribution,
         "confidence": combined_score,
         "label": label,
+        "semantic_score": semantic_result["score"],
+        "stylometric_score": stylometric_result["score"],
     }
 
     if app.debug:
@@ -231,15 +233,6 @@ def submit():
         }
 
     return jsonify(payload), 200
-
-
-def _stub_label(score: float) -> str:
-    """Temporary label mapper — replace with full Label Generator in M5."""
-    if score <= 0.20:
-        return "Human Authored"
-    if score >= 0.85:
-        return "Automated Content"
-    return "Uncertain Origin"
 
 
 @app.route("/log", methods=["GET"])
