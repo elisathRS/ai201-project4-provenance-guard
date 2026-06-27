@@ -75,7 +75,9 @@ A submission flows through the following pipeline:
 
 The final confidence score is computed as:
 
+```text
 confidence = 0.6 * semantic_score + 0.4 * stylometric_score
+```
 
 with a **semantic veto**:
 - If semantic score ≤ 0.25 and stylometric score ≥ 0.75, reduce stylometric weight to 0.25× to avoid false positives from unusual human writing
