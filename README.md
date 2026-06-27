@@ -111,17 +111,19 @@ basket. It was imperfect, warm, and deeply mine."
 **Output:**
 ```json
 {
-  "content_id": "48de3b43-ac12-4d55-ad21-a74d1f7dd696",
-  "attribution": "likely_human",
-  "confidence": 0.192,
-  "label": "Human Authored"
+   "attribution": "likely_human",
+    "confidence": 0.19235294117647062,
+    "content_id": "bc50c07f-4582-4abe-aa0e-020685dce5fa",
+    "label": "Human Authored",
+    "semantic_score": 0.1,
+    "stylometric_score": 0.3308823529411765
 }
 ```
 
 **Why low confidence:**
 - Semantic signal detected idiosyncratic imagery and emotional authenticity (0.05)
 - Stylometric signal found high variance in sentence length and vocabulary diversity (0.45)
-- Combined: 0.6 × 0.05 + 0.4 × 0.45 = 0.192
+- Combined: 0.6 × 0.1 + 0.4 × 0.33 = 0.192
 
 ---
 
@@ -136,17 +138,19 @@ length and structured phrases. [repeated 12 times]"
 **Output:**
 ```json
 {
-  "content_id": "1edba40b-6774-48d4-9ce4-fdbd768b1357",
-  "attribution": "likely_ai",
-  "confidence": 0.986,
-  "label": "Automated Content"
+    "attribution": "likely_ai",
+    "confidence": 0.9786153846153847,
+    "content_id": "10ec00a6-06e1-4adb-b9f3-17297bd771fb",
+    "label": "Automated Content",
+    "semantic_score": 0.99,
+    "stylometric_score": 0.9615384615384616
 }
 ```
 
 **Why high confidence:**
 - Semantic signal detected repetitive syntax and formulaic structure (0.99)
 - Stylometric signal found extremely uniform sentence length and low vocabulary diversity (0.96)
-- Combined: 0.6 × 0.99 + 0.4 × 0.96 = 0.986
+- Combined: 0.6 × 0.99 + 0.4 × 0.96 = 0.978
 
 ---
 
