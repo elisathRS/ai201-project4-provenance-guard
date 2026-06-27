@@ -196,10 +196,14 @@ Submits text for provenance analysis.
 **Response (200 OK):**
 ```json
 {
-  "content_id": "<uuid>",
+  
   "attribution": "likely_human|likely_ai|uncertain",
   "confidence": 0.0–1.0,
+  "content_id": "<uuid>",
   "label": "Human Authored|Automated Content|Uncertain Origin"
+  "semantic_score": 0.0–1.0,
+  "stylometric_score": 0.0–1.0,
+  
 }
 ```
 
