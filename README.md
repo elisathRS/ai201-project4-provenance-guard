@@ -370,3 +370,8 @@ After testing with real submissions, these thresholds produced too many false po
 - 0.20–0.85 → "Uncertain Origin" (everything ambiguous)
 
 This wider "Uncertain" band is more honest about the system's actual confidence limits and reduces false claims of AI authorship on borderline content. The trade-off is that fewer submissions receive a definitive label, but accuracy improved.
+
+
+## Demo Video 
+
+   [Watch the video](https://www.loom.com/share/fe141f1fce8a41bf8e22fea5f45d7baf)
